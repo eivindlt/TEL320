@@ -3,13 +3,6 @@
 import serial
 import numpy as np
 import matplotlib.pyplot as plt
-# import time
-# import csv
-# import os
-# import sys
-# import math
-import scipy.signal as signal
-import re 
 import time
 
 #This function reads the serial data and returns a list of the data
@@ -26,30 +19,52 @@ class RadarOperation:
         
 
     def read_serial_data(self):
+        '''
+        This function reads the serial data and returns a list of the data
+        
+        Parameters
+        ----------
+        None
+            
+        Returns
+        -------
+        serial_data : str
+            The serial data read from the serial port
+        '''
         # Read all the serial data from stream
         serial_data = self.ser.read(self.ser.in_waiting)
         # Convert the data to a string
         serial_data = serial_data.decode('utf-8')
-        #print(serial_data)
-        # Split the data into a list
-        #serial_data = serial_data.split(',')
         return serial_data
 
-    #This function plots the data
+
     def parse_data(self, serial_data):
-        #Find the data length
+        '''
+        This function parses the serial data and returns the envelope data
+        
+        Parameters
+        ----------
+        serial_data : str
+            The serial data to parse
+
+        Returns
+        -------
+        envelope_data : list
+            A list of the envelope data
+        '''
+
+        #Find the start index of the envelope data
         start_index = self.collected_data.find('Envelope data:\n') + 15
+        #Find the data length
         data_length_index = self.collected_data.find('Data length:') + 13
         if self.data_length == 0 and data_length_index != 12:
             self.data_length = int(self.collected_data[data_length_index:data_length_index + 4])
         if data_length_index != 12 or self.data_length != 0:
-            print("Data length: ", self.data_length)
             end_index = start_index + int(self.data_length*self.data_length_factor)
             if start_index != 14 and len(self.collected_data) > end_index and self.data_length != 0:   
                 # Get the envelope data
                 envelope_data_str = self.collected_data[start_index:end_index]
-                #print(envelope_data_str)
-                # Split the envelope data into a list of integers
+                # Split the envelope data into a list of integers if possible and return the data
                 try:
                     envelope_data = list(map(int, envelope_data_str.split()))
                 except:
@@ -65,98 +80,115 @@ class RadarOperation:
                 print("Enough data")
                 return envelope_data
         
-        self.collected_data += serial_data
-        print("Not enough data")
-        #print(self.collected_data)
+        self.collected_data += serial_data # Add the serial data to the collected data
+        time.sleep(0.02) # Sleep for 20 ms to allow more data to be collected
         return None
-
-
     
+    def plot_data_live(self, data, peaks):
+        '''
+        This function plots the data live
 
-            # Find the start and end indices of the all the instances of envelope data
-        #start_indices = [m.start() for m in re.finditer('Envelope data:\n', serial_data)]
-
-        #Use list comprehension to modify the start indices to account for the length of the string
-        #start_indices = [i + 15 for i in start_indices]
-
-
-        # enveloped_data_lists = []
-
-        # for start_index in start_indices[1:]:
-        #     end_index = start_index + 6327
-        #     # Get the envelope data
-        #     envelope_data_str = serial_data[start_index:end_index]
-        #     # Split the envelope data into a list of integers
-        #     envelope_data = list(map(int, envelope_data_str.split()))
+        Parameters
+        ----------
+        data : list
+            The envelope data to plot
+        peaks : list
+            A list of the peaks in the data
         
-        #     # Add the envelope data to the list of lists
-        #     enveloped_data_lists.append(envelope_data)
-        #return enveloped_data_lists
+        Returns
+        -------
+        None
+        '''
 
-    # def plot_data_live(self, enveloped_data_lists):
-    #     data = np.array(enveloped_data_lists[0]).T
-    #     # Create a new figure
-    #     fig, ax = plt.subplots()
-    #     # Create a heatmap plot
-    #     im = ax.imshow(data, cmap='viridis')
-    #     # Set the x-axis label
-    #     ax.set_xlabel('Intensity')
-    #     #Set the y-axis start and end value labes from 200 to 500
-    #     ax.set_yticks([200, 300, 400, 500])
-
-    #     # Set the y-axis label
-    #     ax.set_ylabel('Envelope')
-    #     # Add a colorbar
-    #     cbar = ax.figure.colorbar(im, ax=ax)
-    #     # Show the plot
-    #     plt.show()
-        
-    #     # Fix problem 1: Close the figure to free up memory
-    #     plt.close(fig)
-
-        # Fix problem 2: Remove unused variable "cbar"
-    
-    def plot_data_live(self, data):
+        #Plot peaks as red dots
         plt.ion() # Turn on interactive mode
         plt.clf() # Clear the current figure
-        #Set x axis labels from 50 200 for all the values in the list
-        
+        for peak in peaks:
+            plt.plot(peak[0], peak[1], 'ro')
+            print("Peak: ", peak)
+
+        #Plot the data
         plt.plot(data) # Plot the data
         plt.draw() # Redraw the current figure
         plt.pause(0.1) # Pause for a short period
 
     def log_to_file(self, serial_data):
+        '''
+        This function writes the data to a log file
+        
+        Parameters
+        ----------
+        serial_data : str
+            The serial data to write to the file
+        
+        Returns
+        -------
+        None
+        '''
         # Write the data to a file and overwrite the existing contents
         with open(self.filename, 'a') as f:
             #f.write("NEW PART")
             f.write(serial_data)
+
     def peak_detection(self, serial_data):
-        for i in range(len(serial_data)):
-            if serial_data[i] > 200:
-                print("Peak detected at index: ", i)
-                return i
+        '''
+        This function finds the peaks in the data
+        
+        Parameters
+        ----------
+        serial_data : list
+            A list of the envelope data
+        
+        Returns
+        -------
+        peaks : list
+            A list of the peaks in the data
+        '''
+        #Initialize the list of peaks and the previous largest intensity
+        peaks= []
+        peaks_with_lowest_intensity = []
+        previous_largest_intensity = 0
 
+        for i, intensity in enumerate(serial_data):
+            if i > 0 and i < len(serial_data) - 1:
+                #Adds the peak to the list if the intensity is greater than the previous and next intensity
+                if intensity > serial_data[i - 1] and intensity > serial_data[i + 1]:
+                    peak = [i, intensity]
+                    peaks.append(peak)
+                #Adds the peak to the list if the intensity is equal to the previous intensity and greater than the next intensity
+                elif intensity == previous_largest_intensity and intensity > serial_data[i + 1]:
+                    peak = [i, intensity, lowest_intensity_before]
+                    peaks.append(peak)
+            elif i == 0:
+                lowest_intensity_before = intensity
 
-    #This function writes the data to a csv file
+            #Check if the intensity is greater than the previous intensity, if so, update the previous largest intensity        
+            if intensity > previous_largest_intensity:
+                previous_largest_intensity = intensity
+            #Check if the intensity is less than the previous intensity, if so, reset the previous largest intensity
+            elif intensity < serial_data[i - 1]:
+                previous_largest_intensity = 0
+        return peaks
 
 def main():
+    #Create a new instance of the RadarOperation class
     radar = RadarOperation()
+    #Write a new part to the log file and overwrite the existing contents
     with open(radar.filename, 'w') as f:
-        f.write("NEW PART")
+        f.write("NEW PART\n")
+
+    #Continuously read and plot the serial data
     while True:
         # Read and log the serial data
         data = radar.read_serial_data()
         radar.log_to_file(data)
-        # print(data)
-        # # Parse the data
+        # Parse the data
         parsed_data = radar.parse_data(data)
+        # If the parsed data is not None, find peaks and plot the data
         if parsed_data != None:
-            radar.plot_data_live(parsed_data)
-        #print(parsed_data)
-        #print(parsed_data)
+            peaks = radar.peak_detection(parsed_data)
+            print(peaks)
+            radar.plot_data_live(parsed_data, peaks)
         #Pause for 0.1 seconds
-        time.sleep(0.1)
-        # # Plot the data
-        #plot_data_live(parsed_data)
 
 main()
