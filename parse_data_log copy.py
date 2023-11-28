@@ -27,7 +27,7 @@ def plot_heatmap(enveloped_data_lists):
     plt.show()
 
 
-filename = 'serial_data.log'
+filename = 'serial_data1.log'
 
 # Read the contents of the file
 with open(filename, 'r') as f:
