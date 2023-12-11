@@ -23,7 +23,7 @@ class RadarOperation:
         self.fig, self.ax = plt.subplots()
         self.collected_data_cleaned = False
         self.slope = 0.1 #Slope of the pipe in m/m
-        self.mannings_roghness_coefficient = 0.011 # Mannings roughness coefficient for PVC
+        self.mannings_roughness_coefficient = 0.011 # Mannings roughness coefficient for PVC
 
         # Factor to multiply the data length with to get the length of the envelope data. 
         # This allows for robust reading when the envelope data is not the same length each time
@@ -40,6 +40,7 @@ class RadarOperation:
         self.average_index = 0
         self.flow_rate = 0.0
         self.metadata_read_flag = False
+        self.filtered_peaks = []
 
         
 
@@ -92,19 +93,37 @@ class RadarOperation:
             end_index = start_index + int(self.data_length*self.data_length_factor)
             #Find the index of the distance to water surface data
             distance_index = self.collected_data.find('Distance to water surface: ') + 27
-            if distance_index != 26 and len(self.collected_data) > distance_index + 5:
-                try:
+            water_level_index = self.collected_data.find('Water level: ') + 13
+            flow_rate_index = self.collected_data.find('Flow rate: ') + 11
+            filtered_peaks_index = self.collected_data.find('Filtered peaks: ') + 16
+            try:
+                if distance_index != 26 and len(self.collected_data) > distance_index + 5:
                     self.distance = float(self.collected_data[distance_index:distance_index + 5])
-                except:
-                    print("Error, could not convert distance from water surface to float")
-
-            self.water_level = (self.start_m + self.pipe_diameter) - self.distance
-            if self.water_level < 0: # Only add the water level if it is positive
-                self.water_level = 0
+                if water_level_index != 12 and len(self.collected_data) > water_level_index + 5:
+                    self.water_level = float(self.collected_data[water_level_index:water_level_index + 5])
+                if flow_rate_index != 11 and len(self.collected_data) > flow_rate_index + 5:
+                    self.flow_rate = float(self.collected_data[flow_rate_index:flow_rate_index + 5])
+                if filtered_peaks_index != 15 and len(self.collected_data) > filtered_peaks_index + 5:
+                    self.filtered_peaks = []
+                    filtered_peaks_str = self.collected_data[filtered_peaks_index:filtered_peaks_index + 100]
+                    filtered_peaks_str = filtered_peaks_str.split("\n")
+                    filtered_peaks_str = filtered_peaks_str[0]
+                    filtered_peaks_str = filtered_peaks_str.split(";")
+                    for string in filtered_peaks_str:
+                        string = string.split(",")
+                        if len(string) == 3:
+                            string[0] = int(string[2])
+                            string[1] = int(string[1])
+                            self.filtered_peaks.append(string)
+            except:
+                pass
+            #self.water_level = (self.start_m + self.pipe_diameter) - self.distance
+            #if self.water_level < 0: # Only add the water level if it is positive
+            #   self.water_level = 0
             self.time_elapsed = time.time() - self.start_time
-            self.calculate_flow_rate()
+            #self.calculate_flow_rate()
             #Add meassurment to dataframe
-            new_row = pd.DataFrame({'Time': [self.time_elapsed], 'Water level': [self.water_level], 'Flow rate': [self.flow_rate*1000]})
+            new_row = pd.DataFrame({'Time': [self.time_elapsed], 'Water level': [self.water_level], 'Flow rate': [self.flow_rate]})
             self.measurement_df = pd.concat([self.measurement_df, new_row], ignore_index=True)
 
             if start_index != 14 and len(self.collected_data) > end_index and self.data_length != 0:   
@@ -124,10 +143,10 @@ class RadarOperation:
                     return None
                 self.collected_data = ""
                 self.collected_data_cleaned = True
-                print("Enough data")
+                #print("Enough data")
                 print("Distance to water surface in mm: ", self.distance)
                 print("Water level in mm: ", self.water_level)
-                print("Flow rate in l/s: ", self.flow_rate*1000)
+                print("Flow rate in l/s: ", self.flow_rate)
 
                 return envelope_data
             else:
@@ -193,7 +212,11 @@ class RadarOperation:
         plt.subplot(3, 1, 1)
         #Set plot height to 2/3 of the figure height
         for peak in peaks:
-            plt.plot(peak[0], peak[1], 'ro')
+            #Plot the peaks as red dots with double the size of the other points
+            plt.plot(peak[0], peak[1], 'ro', markersize=10)
+
+        for peak in self.filtered_peaks:
+            plt.plot(peak[0], peak[1], 'bo')
         
         #Calculate the x values and labels for the x axis
         x_values = np.linspace(self.start_m, self.start_m + self.length_m, self.data_length)
@@ -222,8 +245,6 @@ class RadarOperation:
         #Add axis titles
         plt.xlabel('Time [s]')
         plt.ylabel('Flow rate [l/s]')
-        #Add y axis lower limit to flexibel
-        plt.ylim(0, self.flow_rate*1000*1.5)
         plt.plot(self.measurement_df['Time'].to_numpy(), self.measurement_df['Flow rate'].to_numpy())
         
         plt.draw()  # Redraw the current figure
@@ -299,40 +320,40 @@ class RadarOperation:
         return peaks
     
     
-    def calculate_flow_rate(self):
-        '''
-        This function calculates the flow rate based on the average distance to the peak
+    # def calculate_flow_rate(self):
+    #     '''
+    #     This function calculates the flow rate based on the average distance to the peak
         
-        Parameters
-        ----------
-        None
+    #     Parameters
+    #     ----------
+    #     None
         
-        Returns
-        -------
-        None
-        '''
-        D = self.pipe_diameter/1000 # Diameter of the pipe in meters
-        r = D / 2   # Radius of the pipe in meters
-        h = self.water_level/1000 # Height of the water level in meters
-        if h >= self.pipe_diameter/1000:    #If the measured water level is greater than the pipe diameter, the height is set to the pipe diameter
-            h = self.pipe_diameter/1000
-        if h == 0:  # If the water level is 0, the flow rate is 0
-            theta = 0   # Angle from the center to the segment that is submerged
-            W_P = 0     # Wetted perimeter
-            R = 0       # Hydraulic radius
-            A = 0       # Area of the segment that is submerged
-        else:   
-            try: 
-                theta = 2 * math.acos(1 - (h / r)) # Angle from the center to the segment that is submerged
-            except:
-                print("Error, could not calculate theta")
-            W_P = D * (theta / (2 * math.pi))  # Wetted perimeter
-            A = (W_P * h) / 2 # Area of the segment that is submerged
-            R = A / W_P # Hydraulic radius
-        # Mannings roughness coefficient for PVC
-        n = self.mannings_roghness_coefficient
-        # Calculate the flow rate
-        self.flow_rate = (1 / n) * A * R**(2/3) * math.sqrt(self.slope)**(1/2)
+    #     Returns
+    #     -------
+    #     None
+    #     '''
+    #     D = self.pipe_diameter/1000 # Diameter of the pipe in meters
+    #     r = D / 2   # Radius of the pipe in meters
+    #     h = self.water_level/1000 # Height of the water level in meters
+    #     if h >= D:    #If the measured water level is greater than the pipe diameter, the height is set to the pipe diameter
+    #         h = D
+    #     if h == 0:  # If the water level is 0, the flow rate is 0
+    #         theta = 0   # Angle from the center to the segment that is submerged
+    #         W_P = 0     # Wetted perimeter
+    #         R = 0       # Hydraulic radius
+    #         A = 0       # Area of the segment that is submerged
+    #     else:   
+    #         try: 
+    #             theta = 2 * math.acos(1 - (h / r)) # Angle from the center to the segment that is submerged
+    #         except:
+    #             print("Error, could not calculate theta")
+    #         W_P = D * (theta / (2 * math.pi))  # Wetted perimeter
+    #         A = (W_P * h) / 2 # Area of the segment that is submerged
+    #         R = A / W_P # Hydraulic radius
+    #     # Mannings roughness coefficient for PVC
+    #     n = self.mannings_roughness_coefficient
+    #     # Calculate the flow rate
+    #     self.flow_rate = (1 / n) * A * R**(2/3) * math.sqrt(self.slope)
 
 
 def main():
