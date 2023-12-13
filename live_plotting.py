@@ -1,4 +1,4 @@
-# Authors: Eivind Lid Trøen, Elias, Sivert Lynum, Tage Andresen
+# Authors: Eivind Lid Trøen, Elias Evjen Hartmark, Sivert Lynum, Tage Andeesen
 import serial
 import numpy as np
 import matplotlib.pyplot as plt
@@ -329,7 +329,7 @@ class RadarOperation:
     This function is not used in the current version of the program
     calculates the flow rate onboard the MCU and sends it to the computer 
     via UART.
-    
+
     def calculate_flow_rate(self):
         
         This function calculates the flow rate based on the average distance to the peak

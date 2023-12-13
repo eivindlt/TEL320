@@ -1,8 +1,4 @@
-// Copyright (c) Acconeer AB, 2015-2021
-// All rights reserved
-// This file is subject to the terms and conditions defined in the file
-// 'LICENSES/license_acconeer.txt', (BSD 3-Clause License) which is part
-// of this source code package.
+//Authors: Eivind Lid Trøen, Elias Evjen Hartmark, Sivert Lynum, Tage Andeesen
 
 #include <stdbool.h>
 #include <stdint.h>
