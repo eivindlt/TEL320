@@ -16,10 +16,7 @@
 #include "params.h" // Parameters for the sensor and the peak detection algorithm
 #include "calculations.h" // Functions for calculating the flow rate and the distance to the water surface
 
-/** \example example_service_envelope.c
- * @brief This is an example on how the envelope service can be used
- * @n
- * The example executes as follows:
+/* This file contains the main function for the flow measurement application.
  *   - Activate Radar System Software (RSS)
  *   - Create an envelope service configuration
  *   - Update the envelope service configuration with suitable parameters retrieved from the params.h file
