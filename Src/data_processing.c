@@ -10,44 +10,17 @@
 #include "acc_service.h"
 #include "acc_service_envelope.h"
 #include "acc_version.h"
-#include "peak.h"
+#include "data_processing.h" // Peak detection algorithm
 #include "params.h"
 
-void calculate_distance_to_water_surface(float *distance_to_water_surface, float *previous_distance_to_water_surface, uint16_t (*filtered_peaks)[3], uint16_t *filtered_peaks_count, int8_t *full_or_empty_indicator)
-{
-	// Check how many of the filtered peaks there are and if the pipe is full or empty
-	if (*filtered_peaks_count == 0)
-	{
-		printf("No peaks found.\n");
-	}
-	else if (*filtered_peaks_count == 1)
-	{
-		printf("One peak found.\n");
-		if (*full_or_empty_indicator < 0)
-		{
-			// Pipe is empty
-			*distance_to_water_surface = (distance_to_pipe + pipe_diameter) * scale_to_mm;
-		}
-		else if (*full_or_empty_indicator >= 0)
-		{
-			// Pipe is full, or almost full
-			*distance_to_water_surface = filtered_peaks[0][0];
-		}
-	}
-	else
-	{
-		printf("Multiple peaks found.\n");
-		*distance_to_water_surface = filtered_peaks[1][0];
-	}
-	//Discard the measurement if the meassurment is VERY different from the previous one
-	if (fabs(*distance_to_water_surface - *previous_distance_to_water_surface) > pipe_diameter * scale_to_mm / 8 * 5)
-	{
-		*distance_to_water_surface = *previous_distance_to_water_surface;
-	}
-	*previous_distance_to_water_surface = *distance_to_water_surface;
-}
 
-// Filter the data using a moving average filter to remove noise
+/*
+Filters the peaks by taking the average of the peaks that are close to each other.
+How big the window is, is determined by the window_size parameter.
+@param peaks The array that holds the peaks
+@param peaks_count A pointer to the variable that holds the number of peaks
+@param window_size The size of the window
+*/
 void moving_average_filter(uint16_t *data, uint16_t data_length, uint16_t window_size)
 {
     uint16_t *filtered_data = malloc(data_length * sizeof(uint16_t));
@@ -69,8 +42,14 @@ void moving_average_filter(uint16_t *data, uint16_t data_length, uint16_t window
     free(filtered_data);
 }
 
-/* Calculate the ratio of the average of the third quarter of the array to the average of the 
-last quarter of the array to determine if the pipe is full or empty*/
+/*
+    * Calculate the ratio of the average of the third quarter of the array to the average of the 
+        last quarter of the array to determine if the pipe is full or empty
+    * @param data The envelope data
+    * @param data_length The length of the envelope data
+    * @param full_or_empty_indicator A pointer to the variable that indicates if the pipe is full or empty
+    * @return The slope of the second half of the envelope
+*/
 float calculate_slope_second_half(uint16_t *serial_data, uint16_t data_length, int8_t *full_or_empty_indicator)
 {
     float slope = 0.0;
@@ -107,6 +86,13 @@ float calculate_slope_second_half(uint16_t *serial_data, uint16_t data_length, i
 	return slope;
 }
 
+/*
+    * Calculate the flatness of the second half of the envelope
+    * @param data The envelope data
+    * @param data_length The length of the envelope data
+    * @param full_or_empty_indicator A pointer to the variable that indicates if the pipe is full or empty
+    * @return The flatness of the second half of the envelope
+*/
 float calculate_flatness_second_half(uint16_t *serial_data, uint16_t data_length, int8_t *full_or_empty_indicator)
 {
 	float average_second_half = 0;
@@ -135,7 +121,13 @@ float calculate_flatness_second_half(uint16_t *serial_data, uint16_t data_length
 	return flatness_second_half;
 }
 
-//Filter the peaks to remove peaks that are not from the pipe
+/*
+Filter the peaks to remove peaks that are below the threshold or outside the range of the pipe
+@param filtered_peaks The array that will hold the filtered peaks
+@param filtered_peaks_count A pointer to the variable that holds the number of filtered peaks
+@param peaks The array that holds the peaks
+@param peaks_count A pointer to the variable that holds the number of peaks
+*/
 void filter_peaks(uint16_t (*filtered_peaks)[3], uint16_t *filtered_peaks_count, uint16_t (*peaks)[3], uint16_t *peaks_count)
 {
 	for (int i = 0; i < *peaks_count; i++)
@@ -151,7 +143,17 @@ void filter_peaks(uint16_t (*filtered_peaks)[3], uint16_t *filtered_peaks_count,
 	}
 }
 
-//Find the peaks in the envelope data
+/*
+Alogrithm to detect the peaks in the envelope data. It detects points where the intensity is larger than the previous and next point, 
+as well as points where the intensity is the same as the previous point and larger than the next point as long as it is not heading downwards.
+@param serial_data The envelope data
+@param data_length The length of the envelope data
+@param start_m The start distance of the envelope
+@param length_m The length of the envelope
+@param step_length_m The step length of the envelope
+@param peaks The array that will hold the peaks
+@param peaks_count A pointer to the variable that holds the number of peaks
+*/
 void peak_detection(uint16_t *serial_data, uint16_t data_length, float start_m, 
 float length_m, float step_length_m, uint16_t (*peaks)[3], uint16_t *peaks_count)
 {
@@ -200,92 +202,4 @@ float length_m, float step_length_m, uint16_t (*peaks)[3], uint16_t *peaks_count
     }
 }
 
-void update_configuration(acc_service_configuration_t envelope_configuration)
-{
-	float start_m  = distance_to_pipe;
-	float length_m = pipe_diameter+distance_beyond_pipe;
 
-	// Set the start and length of the envelope in meters
-	acc_service_requested_start_set(envelope_configuration, start_m);
-	acc_service_requested_length_set(envelope_configuration, length_m);
-	// Set the profile to 1
-    acc_service_profile_set(envelope_configuration, envelope_profile);
-	// Set how many samples that should be used to calculate the average value
-	acc_service_hw_accelerated_average_samples_set(envelope_configuration, accelerated_average_samples);
-	// Set how much the current measurement should be weighed against the previous one
-	acc_service_envelope_running_average_factor_set(envelope_configuration, running_average_factor);
-	//Set normalization to true or false
-	acc_service_envelope_noise_level_normalization_set(envelope_configuration, normalization);
-	// Set the gain
-	acc_service_receiver_gain_set(envelope_configuration, gain);
-	// Set the signal mode to maximum signal attenuation
-	acc_service_maximize_signal_attenuation_set(envelope_configuration, max_signal);
-}
-
-//Prints the envelope data
-void print_data(uint16_t *data, uint16_t data_length)
-{
-	printf("Envelope data:\n");
-	for (uint16_t i = 0; i < data_length; i++)
-	{
-		if ((i > 0) && ((i % 8) == 0))
-		{
-			printf("\n");
-		}
-
-		printf("%6u", (unsigned int)(data[i]));
-	}
-
-	printf("\n");
-}
-
-void print_results(float *distance_to_water_surface, float *slope_second_half, float *flatness_second_half, int8_t *full_or_empty_indicator, uint16_t *peaks_count, uint16_t *filtered_peaks_count, uint16_t (*filtered_peaks)[3], float *water_level, float *flow_rate)
-{
-	printf("Distance to water surface: %f\n", *distance_to_water_surface);
-    printf("Water level: %f\n", *water_level);
-    printf("Flow rate: %f\n", *flow_rate*1000);
-	printf("Slope of the second half of the envelope: %f\n", *slope_second_half);		//Print the slope of the second half of the envelope
-	printf("Full or empty indicator: %d\n", *full_or_empty_indicator);					//Print the indicator of if the pipe is full or empty
-	printf("Number of peaks: %d\n", *peaks_count);
-	printf("Flatness of the second half of the envelope: %f\n", *flatness_second_half);
-	printf("Number of filtered peaks: %d\n", *filtered_peaks_count);
-    printf("Filtered peaks: ");
-	for (int i = 0; i < *filtered_peaks_count; i++)
-	{
-		printf("%d,%d,%d", filtered_peaks[i][0], filtered_peaks[i][1], filtered_peaks[i][2]);
-        if (i < *filtered_peaks_count - 1)
-        {
-            printf(";");
-        }
-	}
-    printf("\n");
-}
-
-void calculate_flow_rate(float *water_level, float *flow_rate) {
-    float D = pipe_diameter; // Diameter of the pipe in meters
-    float r = D / 2.0f;   // Radius of the pipe in meters
-    float h = *water_level / 1000.0f; // Height of the water level in meters
-    if (h >= D) {    // If the measured water level is greater than the pipe diameter, the height is set to the pipe diameter
-        h = D;
-    }
-    float theta, W_P, R, A;
-    if (h == 0.0f) {  // If the water level is 0, the flow rate is 0
-        theta = 0.0f;   // Angle from the center to the segment that is submerged
-        W_P = 0.0f;     // Wetted perimeter
-        R = 0.0f;       // Hydraulic radius
-        A = 0.0f;       // Area of the segment that is submerged
-    } else {   
-        theta = 2.0f * acosf(1.0f - (h / r)); // Angle from the center to the segment that is submerged
-        if (isnan(theta)) {
-            printf("Error, could not calculate theta\n");
-            return;
-        }
-        W_P = D * (theta / (2.0f * M_PI));  // Wetted perimeter
-        A = (W_P * h) / 2.0f; // Area of the segment that is submerged
-        R = A / W_P; // Hydraulic radius
-    }
-    // Mannings roughness coefficient for PVC
-    float n = mannings_roughness_coefficient;
-    // Calculate the flow rate
-    *flow_rate = ((1.0f / n) * A * powf(R, 2.0f/3.0f)) * sqrtf(slope_pipe);
-    }

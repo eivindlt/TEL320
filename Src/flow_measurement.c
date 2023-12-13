@@ -15,8 +15,10 @@
 #include "acc_service.h"
 #include "acc_service_envelope.h"
 #include "acc_version.h"
-#include "peak.h" // Peak detection algorithm
+#include "data_processing.h" // Peak detection algorithm
+#include "utilities.h" // Functions for printing data and updating the envelope configuration
 #include "params.h" // Parameters for the sensor and the peak detection algorithm
+#include "calculations.h" // Functions for calculating the flow rate and the distance to the water surface
 
 /** \example example_service_envelope.c
  * @brief This is an example on how the envelope service can be used
@@ -24,6 +26,7 @@
  * The example executes as follows:
  *   - Activate Radar System Software (RSS)
  *   - Create an envelope service configuration
+ *   - Update the envelope service configuration with suitable parameters retrieved from the params.h file
  *   - Create an envelope service using the previously created configuration
  *   - Destroy the envelope service configuration
  *   - Activate the envelope service
@@ -166,8 +169,10 @@ int flow_measurement_service_envelope(int argc, char *argv[])
 
 			//Calculate the water level
 			water_level = ((distance_to_pipe+pipe_diameter)*scale_to_mm)- distance_to_water_surface;
+
 			//Calculate the flow rate
 			calculate_flow_rate(&water_level, &flow_rate);
+
 			//Print the results
 			print_results(&distance_to_water_surface, &slope_second_half, &flatness_second_half, &full_or_empty_indicator, &peaks_count, &filtered_peaks_count, filtered_peaks, &water_level, &flow_rate);
 

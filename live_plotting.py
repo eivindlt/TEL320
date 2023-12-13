@@ -284,6 +284,10 @@ class RadarOperation:
     def peak_detection(self, serial_data):
         '''
         This function finds the peaks in the data
+        It works the same way as the in the MCU firmware, 
+        so they should find the same peaks. If desired, it would be
+        quite simple to print the peaks from the MCU firmware and
+        read them in this function instead of finding them again.
         
         Parameters
         ----------
@@ -321,42 +325,46 @@ class RadarOperation:
                 previous_largest_intensity = 0
         return peaks
     
+    '''
+    This function is not used in the current version of the program
+    calculates the flow rate onboard the MCU and sends it to the computer 
+    via UART.
     
-    # def calculate_flow_rate(self):
-    #     '''
-    #     This function calculates the flow rate based on the average distance to the peak
+    def calculate_flow_rate(self):
         
-    #     Parameters
-    #     ----------
-    #     None
+        This function calculates the flow rate based on the average distance to the peak
         
-    #     Returns
-    #     -------
-    #     None
-    #     '''
-    #     D = self.pipe_diameter/1000 # Diameter of the pipe in meters
-    #     r = D / 2   # Radius of the pipe in meters
-    #     h = self.water_level/1000 # Height of the water level in meters
-    #     if h >= D:    #If the measured water level is greater than the pipe diameter, the height is set to the pipe diameter
-    #         h = D
-    #     if h == 0:  # If the water level is 0, the flow rate is 0
-    #         theta = 0   # Angle from the center to the segment that is submerged
-    #         W_P = 0     # Wetted perimeter
-    #         R = 0       # Hydraulic radius
-    #         A = 0       # Area of the segment that is submerged
-    #     else:   
-    #         try: 
-    #             theta = 2 * math.acos(1 - (h / r)) # Angle from the center to the segment that is submerged
-    #         except:
-    #             print("Error, could not calculate theta")
-    #         W_P = D * (theta / (2 * math.pi))  # Wetted perimeter
-    #         A = (W_P * h) / 2 # Area of the segment that is submerged
-    #         R = A / W_P # Hydraulic radius
-    #     # Mannings roughness coefficient for PVC
-    #     n = self.mannings_roughness_coefficient
-    #     # Calculate the flow rate
-    #     self.flow_rate = (1 / n) * A * R**(2/3) * math.sqrt(self.slope)
-
+        Parameters
+        ----------
+        None
+        
+        Returns
+        -------
+        None
+        
+        D = self.pipe_diameter/1000 # Diameter of the pipe in meters
+        r = D / 2   # Radius of the pipe in meters
+        h = self.water_level/1000 # Height of the water level in meters
+        if h >= D:    #If the measured water level is greater than the pipe diameter, the height is set to the pipe diameter
+            h = D
+        if h == 0:  # If the water level is 0, the flow rate is 0
+            theta = 0   # Angle from the center to the segment that is submerged
+            W_P = 0     # Wetted perimeter
+            R = 0       # Hydraulic radius
+            A = 0       # Area of the segment that is submerged
+        else:   
+            try: 
+                theta = 2 * math.acos(1 - (h / r)) # Angle from the center to the segment that is submerged
+            except:
+                print("Error, could not calculate theta")
+            W_P = D * (theta / (2 * math.pi))  # Wetted perimeter
+            A = (W_P * h) / 2 # Area of the segment that is submerged
+            R = A / W_P # Hydraulic radius
+        # Mannings roughness coefficient for PVC
+        n = self.mannings_roughness_coefficient
+        # Calculate the flow rate
+        self.flow_rate = (1 / n) * A * R**(2/3) * math.sqrt(self.slope)
+'''
 
 def main():
     #Create a new instance of the RadarOperation class
