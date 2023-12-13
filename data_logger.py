@@ -3,11 +3,6 @@
 import serial
 import numpy as np
 import matplotlib.pyplot as plt
-# import time
-# import csv
-# import os
-# import sys
-# import math
 import scipy.signal as signal
 
 #This function reads the serial data and returns a list of the data
