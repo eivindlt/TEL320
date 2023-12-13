@@ -245,6 +245,8 @@ class RadarOperation:
         #Add axis titles
         plt.xlabel('Time [s]')
         plt.ylabel('Flow rate [l/s]')
+        #Start y axis at 0 but adapt to the maximum value in the dataframe
+        plt.ylim(0, self.measurement_df['Flow rate'].max()*1.2)
         plt.plot(self.measurement_df['Time'].to_numpy(), self.measurement_df['Flow rate'].to_numpy())
         
         plt.draw()  # Redraw the current figure
