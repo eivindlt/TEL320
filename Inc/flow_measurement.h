@@ -1,9 +1,5 @@
-// Copyright (c) Acconeer AB, 2019-2021
-// All rights reserved
-
-
-#ifndef EXAMPLE_SERVICE_ENVELOPE_H_
-#define EXAMPLE_SERVICE_ENVELOPE_H_
+#ifndef FLOW_MEASUREMENT_H
+#define FLOW_MEASUREMENT_H
 
 #include <stdbool.h>
 
@@ -15,4 +11,4 @@
 int flow_measurement_service_envelope(int argc, char *argv[]);
 
 
-#endif
+#endif  // FLOW_MEASUREMENT_H

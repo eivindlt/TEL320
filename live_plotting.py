@@ -1,4 +1,4 @@
-# Authors: Eivind Lid Trøen, Elias Evjen Hartmark, Sivert Lynum, Tage Andeesen
+# Authors: Eivind Lid Trøen, Elias Evjen Hartmark, Sivert Lynum, Tage Andersen
 import serial
 import numpy as np
 import matplotlib.pyplot as plt
